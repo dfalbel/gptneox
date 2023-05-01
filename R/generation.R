@@ -1,33 +1,67 @@
-#' Generate <- nn_module(
-#'   initialize = function(model, ...) {
-#'     # The contract is that model when called with inputs should return a named
-#'     # list containing an element called 'logits'.
-#'     self$model <- model
-#'   },
-#'   generate = function(inputs, max_tokens, ) {
-#'     config <- new_generation_config(...)
+
+#' Samples tokens from GPT NeoX model
 #'
-#'   }
-#' )
+#' @param model A GPTNeoX Model as created with [gpt_neox_from_pretrained()]
+#' @param tokenizer A GPTNeoX tokenizer as created with [gpt_neox_tokenizer_from_pretrained()]
+#' @param prompt A text prompt.
+#' @param config Configuration for generation.
+#' @param verbose Wether to print output during generation.
 #'
+#' @importFrom rlang %||%
 #'
-#' #' A very small subset of generation configurations supported in HF transformers
-#' #'
-#' #' @importFrom rlang %||%
-#' #'
-#' new_generation_config <- function(...) {
-#'   args <- rlang::list2(...)
-#'   config <- list()
-#'
-#'   # Parameters that control the length of the output
-#'   config$max_length = args$max_length %||% 20
-#'   config$max_new_tokens = args$max_new_tokens %||% NULL
-#'   config$min_length = args$min_length %||% 0
-#'
-#'   # Parameters that control the generation strategy used
-#'   config$do_sample = args$do_sample %||% TRUE
-#'
-#'   # Parameters for manipulation of the model output logits
-#'   self$temperature = args$temperature %||% 1.0
-#'   self$top_k = args$top_k %||% 50
-#' }
+#' @export
+gpt_neox_generate <- function(model, tokenizer, prompt, ..., config = list(), verbose = TRUE) {
+  config$max_new_tokens <- config$max_new_tokens %||% 64
+  config$do_sample <- config$do_sample %||% FALSE
+  config$bos_token_id <- config$bos_token_id %||% 0
+  config$eos_token_id <- config$eos_token_id %||% 0
+  config$top_k <- config$top_k %||% 50
+  config$temperature <- config$temperature %||% 1
+
+  new_tokens <- list()
+  new_text <- list()
+
+  model$eval() # model should be in eval mode
+  for (i in seq_len(config$max_new_tokens)) {
+    encoding <- tokenizer$encode(prompt)
+
+    inputs <- torch_tensor(encoding$ids + 1L)$unsqueeze(1)
+    mask <- torch_tensor(encoding$attention_mask)$unsqueeze(1)
+
+    with_no_grad({
+      out <- model(inputs, attention_mask = mask)
+    })
+
+    logits <- out$logits[,-1,]
+    logits <- logits/config$temperature
+    logits <- logits$topk(config$top_k)
+
+    probs <- as.numeric(nnf_softmax(logits[[1]], dim = -1))
+    token_ids <- as.integer(logits[[2]])
+
+    token <- sample(token_ids, 1, prob = probs)
+    new <- tokenizer$decode(as.integer(token) - 1L)
+
+    if (verbose) {
+      if (i == 1) cat(prompt)
+      cat(new)
+    }
+
+    new_tokens[[length(new_tokens) + 1]] <- token
+    new_text[[length(new_text) + 1]] <- new
+
+    if ((token - 1L) == config$eos_token_id) {
+      break
+    }
+
+    prompt <- paste0(prompt, new)
+  }
+
+  if (verbose) cat("\n")
+
+  list(
+    prompt = prompt,
+    new_tokens = new_tokens,
+    new_text = new_text
+  )
+}

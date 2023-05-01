@@ -31,3 +31,5 @@ Collate:
     'gptneox.R'
 Remotes:
     dfalbel/tok
+URL: https://github.com/dfalbel/gptneox
+BugReports: https://github.com/dfalbel/gptneox/issues

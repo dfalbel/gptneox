@@ -12,7 +12,7 @@
 #' @export
 gpt_neox_generate <- function(model, tokenizer, prompt, ..., config = list(), verbose = TRUE) {
   config$max_new_tokens <- config$max_new_tokens %||% 64
-  config$do_sample <- config$do_sample %||% FALSE
+  config$do_sample <- config$do_sample %||% TRUE
   config$bos_token_id <- config$bos_token_id %||% 0
   config$eos_token_id <- config$eos_token_id %||% 0
   config$top_k <- config$top_k %||% 50
@@ -33,13 +33,20 @@ gpt_neox_generate <- function(model, tokenizer, prompt, ..., config = list(), ve
     })
 
     logits <- out$logits[,-1,]
-    logits <- logits/config$temperature
-    logits <- logits$topk(config$top_k)
 
-    probs <- as.numeric(nnf_softmax(logits[[1]], dim = -1))
-    token_ids <- as.integer(logits[[2]])
+    if (config$do_sample) {
 
-    token <- sample(token_ids, 1, prob = probs)
+      logits <- logits/config$temperature
+      logits <- logits$topk(config$top_k)
+
+      probs <- as.numeric(nnf_softmax(logits[[1]], dim = -1))
+      token_ids <- as.integer(logits[[2]])
+
+      token <- sample(token_ids, 1, prob = probs)
+    } else {
+      token <- as.integer(logits$argmax(dim = -1))
+    }
+
     new <- tokenizer$decode(as.integer(token) - 1L)
 
     if (verbose) {

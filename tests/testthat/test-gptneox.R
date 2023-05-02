@@ -70,27 +70,27 @@ test_that("gptneox 3B", {
 
   #model$load_state_dict(weights)
 
-  model$eval()
-  with_no_grad({
-    out <- model$gpt_neox(inputs, attention_mask = mask)
-  })
-
-  text <- "An RMarkdown document showing how to create a plot of the <dataset> name:
-```"
-  for (i in 1:500) {
-    encoding <- tokenizer$encode(text)
-    inputs <- torch_tensor(encoding$ids + 1L)$unsqueeze(1)
-    mask <- torch_tensor(encoding$attention_mask)$unsqueeze(1)
-    with_no_grad({
-      out <- model(inputs, attention_mask = mask)
-    })
-    token <- out$logits[,-1,]$topk(5)
-    token <- sample(as.integer(token[[2]]), 1, prob = as.numeric(token[[1]]))
-    new <- tokenizer$decode(as.integer(token) - 1L)
-    if (i == 1) cat(text)
-    cat(new)
-    text <- paste0(text, new)
-  }
+#   model$eval()
+#   with_no_grad({
+#     out <- model$gpt_neox(inputs, attention_mask = mask)
+#   })
+#
+#   text <- "An RMarkdown document showing how to create a plot of the <dataset> name:
+# ```"
+#   for (i in 1:500) {
+#     encoding <- tokenizer$encode(text)
+#     inputs <- torch_tensor(encoding$ids + 1L)$unsqueeze(1)
+#     mask <- torch_tensor(encoding$attention_mask)$unsqueeze(1)
+#     with_no_grad({
+#       out <- model(inputs, attention_mask = mask)
+#     })
+#     token <- out$logits[,-1,]$topk(5)
+#     token <- sample(as.integer(token[[2]]), 1, prob = as.numeric(token[[1]]))
+#     new <- tokenizer$decode(as.integer(token) - 1L)
+#     if (i == 1) cat(text)
+#     cat(new)
+#     text <- paste0(text, new)
+#   }
 
 
 

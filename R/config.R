@@ -253,8 +253,8 @@ hub_download <- function(repo_id, filename, ..., revision = "main", repo_type = 
   withr::with_tempfile("tmp", {
     lock <- filelock::lock(paste0(blob_path, ".lock"))
     on.exit({filelock::unlock(lock)})
-    curl::curl_download(url, tmp)
-    fs::file_copy(tmp, blob_path)
+    curl::curl_download(url, tmp, quiet = !interactive())
+    fs::file_move(tmp, blob_path)
     fs::link_create(blob_path, pointer_path)
   })
 
@@ -283,7 +283,7 @@ get_file_metadata <- function(url) {
   )
   list(
     commit_hash = grab_from_headers(req$all_headers, "x-repo-commit"),
-    etag = grab_from_headers(req$all_headers, "etag"),
+    etag = normalize_etag(grab_from_headers(req$all_headers, "etag")),
     size = as.integer(grab_from_headers(req$all_headers, "content-length"))
   )
 }
@@ -295,6 +295,13 @@ grab_from_headers <- function(headers, nm) {
       return(header[[nm]])
   }
   NULL
+}
+
+normalize_etag <- function(etag) {
+  if (is.null(etag)) return(NULL)
+  etag <- gsub(pattern = '"', x = etag, replacement = "")
+  etag <- gsub(pattern = "W/", x = etag, replacement = "")
+  etag
 }
 
 REPO_ID_SEPARATOR <- function() {

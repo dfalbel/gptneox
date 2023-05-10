@@ -372,7 +372,8 @@ GPTNeoXModel <- nn_module(
       # Since we are adding it to the raw scores before the softmax, this is
       # effectively the same as removing these entirely.
       attention_mask <- attention_mask$to(dtype=self$dtype)  # fp16 compatibility
-      attention_mask <- (1.0 - attention_mask) * torch_finfo(attention_mask$dtype)$min
+      finfo_min <- torch_tensor(torch_finfo(attention_mask$dtype)$min, dtype=self$dtype, device=attention_mask$device)
+      attention_mask <- (1.0 - attention_mask) * finfo_min
     }
 
     # Prepare head mask if needed

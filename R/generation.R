@@ -20,13 +20,14 @@ gpt_neox_generate <- function(model, tokenizer, prompt, ..., config = list(), ve
 
   new_tokens <- list()
   new_text <- list()
+  device <- model$gpt_neox$embed_in$weight$device
 
   model$eval() # model should be in eval mode
   for (i in seq_len(config$max_new_tokens)) {
     encoding <- tokenizer$encode(prompt)
 
-    inputs <- torch_tensor(encoding$ids + 1L)$unsqueeze(1)
-    mask <- torch_tensor(encoding$attention_mask)$unsqueeze(1)
+    inputs <- torch_tensor(encoding$ids + 1L, device = device)$unsqueeze(1)
+    mask <- torch_tensor(encoding$attention_mask, device = device)$unsqueeze(1)
 
     with_no_grad({
       out <- model(inputs, attention_mask = mask)
@@ -39,8 +40,8 @@ gpt_neox_generate <- function(model, tokenizer, prompt, ..., config = list(), ve
       logits <- logits/config$temperature
       logits <- logits$topk(config$top_k)
 
-      probs <- as.numeric(nnf_softmax(logits[[1]], dim = -1))
-      token_ids <- as.integer(logits[[2]])
+      probs <- as.numeric(nnf_softmax(logits[[1]]$cpu(), dim = -1))
+      token_ids <- as.integer(logits[[2]]$cpu())
 
       token <- sample(token_ids, 1, prob = probs)
     } else {

@@ -36,14 +36,11 @@ gpt_neox_generate <- function(model, tokenizer, prompt, ..., config = list(), ve
     logits <- out$logits[,-1,]
 
     if (config$do_sample) {
-
       logits <- logits/config$temperature
       logits <- logits$topk(config$top_k)
 
-      probs <- as.numeric(nnf_softmax(logits[[1]]$cpu(), dim = -1))
-      token_ids <- as.integer(logits[[2]]$cpu())
-
-      token <- sample(token_ids, 1, prob = probs)
+      selected <- torch_multinomial(nnf_softmax(logits[[1]], dim = -1), num_samples = 1)
+      token <- logits[[2]][,selected$item()]$item()
     } else {
       token <- as.integer(logits$argmax(dim = -1))
     }

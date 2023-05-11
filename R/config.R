@@ -92,9 +92,11 @@ gpt_neox_from_pretrained <- function(identifier, ..., revision = "main") {
     })
     names(weights_path) <- NULL
   }
-  model <- do.call(config$architectures, list(config = config))
+  with_device(device = "meta", {
+    model <- do.call(config$architectures, list(config = config))
+  })
   weights <- do.call("c", lapply(weights_path, torch::load_state_dict))
-  model$load_state_dict(weights)
+  model$load_state_dict(weights, .refer_to_state_dict = TRUE)
   model
 }
 

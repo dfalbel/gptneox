@@ -173,31 +173,27 @@ RotaryEmbedding <- nn_module(
   "RotaryEmbedding",
   initialize = function(dim, max_position_embeddings, base=10000, device=NULL) {
     # we might need 0-(dim-1) instead.
-    inv_freq <- 1.0 / (base ^ (torch_arange(0, dim-1, 2)$float()$to(device=device) / dim))
-    self$register_buffer("inv_freq", inv_freq)
-
+    self$inv_freq <- nn_buffer(1.0 / (base ^ (torch_arange(0, dim-1, 2, dtype=torch_float()) / dim)))
     # Build here to make `torch.jit.trace` work.
     self$max_seq_len_cached <- max_position_embeddings
-    t <- torch_arange(start = 0, end = self$max_seq_len_cached-1, device=self$inv_freq$device, dtype=self$inv_freq$dtype)
+    self$set_non_persistent_buffers()
+  },
+  .load_from_state_dict = function(...) {
+    super$.load_from_state_dict(...)
+    self$set_non_persistent_buffers()
+  },
+  set_non_persistent_buffers = function() {
+    t <- torch_arange(start = 0, end = self$max_seq_len_cached-1, dtype = torch_float())
     freqs <- torch_einsum("i,j->ij", list(t, self$inv_freq))
     # Different from paper, but it uses a different permutation in order to obtain the same calculation
     emb <- torch_cat(list(freqs, freqs), dim=-1)
-    self$cos_cached <- emb$cos()[newaxis, newaxis, , ]
-    self$sin_cached <- emb$sin()[newaxis, newaxis, , ]
+    self$cos_cached <- nn_buffer(emb$cos()[newaxis, newaxis, , ], persistent=FALSE)
+    self$sin_cached <- nn_buffer(emb$sin()[newaxis, newaxis, , ], persistent=FALSE)
   },
   forward = function(x, seq_len = NULL) {
-    if (!is.null(seq_len) && seq_len > self$max_seq_len_cached) {
-      self$max_seq_len_cached <- seq_len
-      t <- torch_arange(start = 1, end = self$max_seq_len_cached, device=x$device, dtype=self$inv_freq$dtype)
-      freqs <- torch_einsum("i,j->ij", t, self$inv_freq)
-      # Different from paper, but it uses a different permutation in order to obtain the same calculation
-      emb <- torch_cat(list(freqs, freqs), dim=-1)$to(device = x$device)
-      self$cos_cached <- emb$cos()[newaxis, newaxis, , ]
-      self$sin_cached <- emb$sin()[newaxis, newaxis, , ]
-    }
     list(
-      self$cos_cached[1:seq_len, ..]$to(device=x$device),
-      self$sin_cached[1:seq_len, ..]$to(device=x$device)
+      self$cos_cached[1:seq_len, ..],#$to(device=x$device),
+      self$sin_cached[1:seq_len, ..]#$to(device=x$device)
     )
   }
 )
